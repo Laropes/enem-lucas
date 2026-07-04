@@ -1,5 +1,5 @@
 import { createServerFn } from "@tanstack/react-start";
-import { generateText, Output, NoObjectGeneratedError } from "ai";
+import { generateObject, NoObjectGeneratedError } from "ai";
 import { z } from "zod";
 import { createLovableAiGatewayProvider } from "./ai-gateway.server";
 
@@ -66,15 +66,16 @@ Regras obrigatórias:
 Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").`;
 
     try {
-      const { output } = await generateText({
+      const { object } = await generateObject({
         model: gateway("google/gemini-3-flash-preview"),
         system,
         prompt,
-        output: Output.object({ schema: QuestionSchema }),
+        schema: QuestionSchema,
       });
-      return output;
+      return object;
     } catch (error) {
       if (NoObjectGeneratedError.isInstance(error)) {
+        console.error("NoObjectGenerated:", error.text);
         throw new Error("Não foi possível gerar a questão. Tente novamente.");
       }
       throw error;
