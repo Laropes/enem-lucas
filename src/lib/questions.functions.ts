@@ -30,6 +30,8 @@ const QuestionSchema = z.object({
   resolucao: z.string(),
   anoReferencia: z.string(),
   imagemSvg: z.string().optional(),
+  descricaoImagem: z.string().optional(),
+  imagemUrl: z.string().optional(),
 });
 
 const RawQuestionSchema = z
@@ -49,6 +51,7 @@ const RawQuestionSchema = z
     resolucao: z.string(),
     anoReferencia: z.string(),
     imagemSvg: z.string().optional(),
+    descricaoImagem: z.string().optional(),
   })
   .transform((question) => ({
     tema: question.tema ?? question.titulo ?? "Física do ENEM",
@@ -58,6 +61,7 @@ const RawQuestionSchema = z
     resolucao: question.resolucao,
     anoReferencia: question.anoReferencia,
     imagemSvg: question.imagemSvg,
+    descricaoImagem: question.descricaoImagem,
   }));
 
 export type Question = z.infer<typeof QuestionSchema>;
@@ -110,9 +114,9 @@ Regras obrigatórias:
 
 Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").
 
-Sempre que o problema envolver diagramas (circuitos, forças, planos inclinados, lentes, ondas, gráficos etc.), inclua o campo opcional "imagemSvg" com um SVG INLINE COMPLETO (começando com <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" ...>) representando a figura da questão. Use traços simples, rótulos, setas para vetores, cores claras contra fundo escuro (stroke branco/cinza claro, fill transparente). Se a questão não precisar de figura, OMITA o campo imagemSvg.
+Sempre que o problema envolver diagramas (circuitos, forças, planos inclinados, lentes, ondas, gráficos etc.), inclua o campo opcional "descricaoImagem" com uma descrição VISUAL DETALHADA em português da figura que deve acompanhar a questão. Descreva de forma clara e específica todos os elementos, rótulos, vetores, ângulos e valores relevantes (ex: "Diagrama esquemático de um plano inclinado de 30° com um bloco de massa m sobre a superfície, seta indicando o vetor peso vertical para baixo e vetor normal perpendicular ao plano, rótulos 'm', 'θ=30°', 'N', 'P'."). Não inclua o campo imagemSvg. Se a questão não precisar de figura, OMITA descricaoImagem.
 
-Responda como um único objeto JSON com exatamente estes campos: tema, enunciado, alternativas, correta, resolucao, anoReferencia e opcionalmente imagemSvg. O campo alternativas deve ter as chaves A, B, C, D e E. O campo correta deve ser apenas uma letra de A até E.`;
+Responda como um único objeto JSON com exatamente estes campos: tema, enunciado, alternativas, correta, resolucao, anoReferencia e opcionalmente descricaoImagem. O campo alternativas deve ter as chaves A, B, C, D e E. O campo correta deve ser apenas uma letra de A até E.`;
 
     try {
       const { object } = await generateObject({
@@ -122,11 +126,11 @@ Responda como um único objeto JSON com exatamente estes campos: tema, enunciado
         schema: QuestionSchema,
         maxOutputTokens: 3000,
       });
-      return object;
+      return await withImage(object, key);
     } catch (error) {
       if (NoObjectGeneratedError.isInstance(error)) {
         const fallbackQuestion = parseQuestionFromText(error.text);
-        if (fallbackQuestion) return fallbackQuestion;
+        if (fallbackQuestion) return await withImage(fallbackQuestion, key);
 
         console.error("NoObjectGenerated:", error.text);
         throw new Error("Não foi possível gerar a questão. Tente novamente.");
@@ -134,3 +138,39 @@ Responda como um único objeto JSON com exatamente estes campos: tema, enunciado
       throw error;
     }
   });
+
+async function withImage(question: Question, apiKey: string): Promise<Question> {
+  if (!question.descricaoImagem) return question;
+  try {
+    const imagemUrl = await generateDiagramImage(question.descricaoImagem, apiKey);
+    return { ...question, imagemUrl };
+  } catch (err) {
+    console.error("Falha ao gerar imagem da questão:", err);
+    return question;
+  }
+}
+
+async function generateDiagramImage(descricao: string, apiKey: string): Promise<string> {
+  const prompt = `Diagrama didático de física estilo livro escolar, limpo e simples, fundo branco, linhas pretas nítidas, rótulos legíveis em português, setas para vetores quando aplicável, sem sombras realistas nem estilo 3D fotorrealista. Represente com precisão: ${descricao}`;
+
+  const res = await fetch("https://ai.gateway.lovable.dev/v1/images/generations", {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${apiKey}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      model: "google/gemini-2.5-flash-image",
+      messages: [{ role: "user", content: prompt }],
+      modalities: ["image", "text"],
+    }),
+  });
+
+  if (!res.ok) {
+    throw new Error(`Image gen failed: ${res.status} ${await res.text().catch(() => "")}`);
+  }
+  const json = (await res.json()) as { data?: Array<{ b64_json?: string }> };
+  const b64 = json.data?.[0]?.b64_json;
+  if (!b64) throw new Error("Sem imagem retornada");
+  return `data:image/png;base64,${b64}`;
+}
