@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Atom, Sparkles, Eye, RefreshCw, CheckCircle2, XCircle, Loader2, BookOpen } from "lucide-react";
+import { Atom, Sparkles, Eye, RefreshCw, CheckCircle2, XCircle, Loader2, BookOpen, History, Trash2, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -22,6 +22,18 @@ export const Route = createFileRoute("/")({
 type Letter = "A" | "B" | "C" | "D" | "E";
 const LETTERS: Letter[] = ["A", "B", "C", "D", "E"];
 
+type HistoryItem = {
+  id: string;
+  createdAt: number;
+  topic: Topic;
+  question: Question;
+  selected: Letter | null;
+  acertou: boolean | null;
+};
+
+const HISTORY_KEY = "fisica-enem-historico-v1";
+const MAX_HISTORY = 50;
+
 function Home() {
   const generate = useServerFn(generateQuestion);
   const [topic, setTopic] = useState<Topic>("Aleatório");
@@ -30,15 +42,49 @@ function Home() {
   const [selected, setSelected] = useState<Letter | null>(null);
   const [revealed, setRevealed] = useState(false);
   const [stats, setStats] = useState({ acertos: 0, erros: 0 });
+  const [history, setHistory] = useState<HistoryItem[]>([]);
+  const [currentId, setCurrentId] = useState<string | null>(null);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(HISTORY_KEY);
+      if (raw) {
+        const parsed: HistoryItem[] = JSON.parse(raw);
+        setHistory(parsed);
+        const a = parsed.filter((h) => h.acertou === true).length;
+        const e = parsed.filter((h) => h.acertou === false).length;
+        setStats({ acertos: a, erros: e });
+      }
+    } catch {}
+  }, []);
+
+  function persist(next: HistoryItem[]) {
+    setHistory(next);
+    try {
+      localStorage.setItem(HISTORY_KEY, JSON.stringify(next));
+    } catch {}
+  }
 
   async function handleGenerate() {
     setLoading(true);
     setQuestion(null);
     setSelected(null);
     setRevealed(false);
+    setCurrentId(null);
     try {
       const q = await generate({ data: { topic } });
       setQuestion(q);
+      const item: HistoryItem = {
+        id: crypto.randomUUID(),
+        createdAt: Date.now(),
+        topic,
+        question: q,
+        selected: null,
+        acertou: null,
+      };
+      setCurrentId(item.id);
+      persist([item, ...history].slice(0, MAX_HISTORY));
     } catch (e) {
       const msg = e instanceof Error ? e.message : "Erro ao gerar a questão";
       toast.error(msg);
@@ -49,22 +95,64 @@ function Home() {
 
   function handleReveal() {
     if (!question) return;
+    let acertou: boolean | null = null;
     if (!revealed && selected) {
+      acertou = selected === question.correta;
       setStats((s) =>
-        selected === question.correta
+        acertou
           ? { ...s, acertos: s.acertos + 1 }
           : { ...s, erros: s.erros + 1 },
       );
     }
     setRevealed(true);
+    if (currentId) {
+      persist(
+        history.map((h) =>
+          h.id === currentId ? { ...h, selected, acertou } : h,
+        ),
+      );
+    }
+  }
+
+  function loadFromHistory(item: HistoryItem) {
+    setQuestion(item.question);
+    setTopic(item.topic);
+    setSelected(item.selected);
+    setRevealed(item.selected !== null);
+    setCurrentId(item.id);
+    setSidebarOpen(false);
+  }
+
+  function clearHistory() {
+    persist([]);
+    setStats({ acertos: 0, erros: 0 });
+    setCurrentId(null);
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground">
+    <div className="min-h-screen bg-background text-foreground lg:flex">
+      <HistorySidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        history={history}
+        currentId={currentId}
+        onSelect={loadFromHistory}
+        onClear={clearHistory}
+      />
+      <div className="flex-1 min-w-0">
       {/* Header */}
       <header className="border-b border-border/60 bg-[image:var(--gradient-hero)]">
         <div className="mx-auto max-w-4xl px-6 py-10">
           <div className="flex items-center gap-3">
+            <Button
+              variant="ghost"
+              size="icon"
+              className="lg:hidden"
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Abrir histórico"
+            >
+              <History className="size-5" />
+            </Button>
             <div className="grid size-11 place-items-center rounded-xl bg-[image:var(--gradient-primary)] shadow-[var(--shadow-glow)]">
               <Atom className="size-6 text-primary-foreground" />
             </div>
@@ -160,6 +248,13 @@ function Home() {
                 {question.enunciado}
               </p>
 
+              {question.imagemSvg && (
+                <div
+                  className="mt-5 overflow-hidden rounded-lg border border-border/60 bg-background/40 p-3 [&_svg]:mx-auto [&_svg]:h-auto [&_svg]:max-h-[320px] [&_svg]:w-full [&_svg]:max-w-md"
+                  dangerouslySetInnerHTML={{ __html: question.imagemSvg }}
+                />
+              )}
+
               <div className="mt-6 space-y-2">
                 {LETTERS.map((L) => {
                   const isSelected = selected === L;
@@ -246,7 +341,121 @@ function Home() {
           Feito para estudar Física do ENEM • Questões geradas por IA
         </footer>
       </main>
+      </div>
     </div>
+  );
+}
+
+function HistorySidebar({
+  open,
+  onClose,
+  history,
+  currentId,
+  onSelect,
+  onClear,
+}: {
+  open: boolean;
+  onClose: () => void;
+  history: HistoryItem[];
+  currentId: string | null;
+  onSelect: (item: HistoryItem) => void;
+  onClear: () => void;
+}) {
+  return (
+    <>
+      {open && (
+        <div
+          className="fixed inset-0 z-40 bg-background/70 backdrop-blur-sm lg:hidden"
+          onClick={onClose}
+        />
+      )}
+      <aside
+        className={cn(
+          "fixed inset-y-0 left-0 z-50 flex w-80 flex-col border-r border-border/60 bg-card/95 backdrop-blur transition-transform lg:sticky lg:top-0 lg:z-10 lg:h-screen lg:translate-x-0",
+          open ? "translate-x-0" : "-translate-x-full",
+        )}
+      >
+        <div className="flex items-center gap-2 border-b border-border/60 px-4 py-4">
+          <History className="size-5 text-primary" />
+          <h2 className="font-semibold">Histórico</h2>
+          <span className="ml-auto text-xs text-muted-foreground">
+            {history.length}
+          </span>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="lg:hidden"
+            onClick={onClose}
+            aria-label="Fechar"
+          >
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-3">
+          {history.length === 0 ? (
+            <p className="mt-8 text-center text-xs text-muted-foreground">
+              Nenhuma questão gerada ainda.
+            </p>
+          ) : (
+            <ul className="space-y-2">
+              {history.map((h) => {
+                const preview = h.question.enunciado.slice(0, 90);
+                const active = h.id === currentId;
+                return (
+                  <li key={h.id}>
+                    <button
+                      type="button"
+                      onClick={() => onSelect(h)}
+                      className={cn(
+                        "w-full rounded-lg border p-3 text-left text-xs transition",
+                        "border-border/60 bg-secondary/30 hover:border-primary/50 hover:bg-secondary/60",
+                        active && "border-primary bg-primary/10",
+                      )}
+                    >
+                      <div className="mb-1 flex items-center gap-2">
+                        <span className="rounded-full border border-primary/40 bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-primary">
+                          {h.question.tema}
+                        </span>
+                        {h.acertou === true && (
+                          <CheckCircle2 className="size-3.5 text-success" />
+                        )}
+                        {h.acertou === false && (
+                          <XCircle className="size-3.5 text-destructive" />
+                        )}
+                        <span className="ml-auto text-[10px] text-muted-foreground">
+                          {new Date(h.createdAt).toLocaleDateString("pt-BR", {
+                            day: "2-digit",
+                            month: "2-digit",
+                          })}
+                        </span>
+                      </div>
+                      <p className="line-clamp-3 text-foreground/85">
+                        {preview}
+                        {h.question.enunciado.length > 90 && "…"}
+                      </p>
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          )}
+        </div>
+
+        {history.length > 0 && (
+          <div className="border-t border-border/60 p-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={onClear}
+              className="w-full text-muted-foreground hover:text-destructive"
+            >
+              <Trash2 className="size-4" /> Limpar histórico
+            </Button>
+          </div>
+        )}
+      </aside>
+    </>
   );
 }
 
