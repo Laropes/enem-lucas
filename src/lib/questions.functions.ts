@@ -29,6 +29,7 @@ const QuestionSchema = z.object({
   correta: z.enum(["A", "B", "C", "D", "E"]),
   resolucao: z.string(),
   anoReferencia: z.string(),
+  imagemSvg: z.string().optional(),
 });
 
 const RawQuestionSchema = z
@@ -47,6 +48,7 @@ const RawQuestionSchema = z
     alternativaCorreta: z.enum(["A", "B", "C", "D", "E"]).optional(),
     resolucao: z.string(),
     anoReferencia: z.string(),
+    imagemSvg: z.string().optional(),
   })
   .transform((question) => ({
     tema: question.tema ?? question.titulo ?? "Física do ENEM",
@@ -55,6 +57,7 @@ const RawQuestionSchema = z
     correta: question.correta ?? question.alternativaCorreta ?? "A",
     resolucao: question.resolucao,
     anoReferencia: question.anoReferencia,
+    imagemSvg: question.imagemSvg,
   }));
 
 export type Question = z.infer<typeof QuestionSchema>;
@@ -107,7 +110,9 @@ Regras obrigatórias:
 
 Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").
 
-Responda como um único objeto JSON com exatamente estes campos: tema, enunciado, alternativas, correta, resolucao, anoReferencia. O campo alternativas deve ter as chaves A, B, C, D e E. O campo correta deve ser apenas uma letra de A até E.`;
+Sempre que o problema envolver diagramas (circuitos, forças, planos inclinados, lentes, ondas, gráficos etc.), inclua o campo opcional "imagemSvg" com um SVG INLINE COMPLETO (começando com <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 260" ...>) representando a figura da questão. Use traços simples, rótulos, setas para vetores, cores claras contra fundo escuro (stroke branco/cinza claro, fill transparente). Se a questão não precisar de figura, OMITA o campo imagemSvg.
+
+Responda como um único objeto JSON com exatamente estes campos: tema, enunciado, alternativas, correta, resolucao, anoReferencia e opcionalmente imagemSvg. O campo alternativas deve ter as chaves A, B, C, D e E. O campo correta deve ser apenas uma letra de A até E.`;
 
     try {
       const { object } = await generateObject({
