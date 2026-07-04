@@ -31,11 +31,53 @@ const QuestionSchema = z.object({
   anoReferencia: z.string(),
 });
 
+const RawQuestionSchema = z
+  .object({
+    tema: z.string().optional(),
+    titulo: z.string().optional(),
+    enunciado: z.string(),
+    alternativas: z.object({
+      A: z.string(),
+      B: z.string(),
+      C: z.string(),
+      D: z.string(),
+      E: z.string(),
+    }),
+    correta: z.enum(["A", "B", "C", "D", "E"]).optional(),
+    alternativaCorreta: z.enum(["A", "B", "C", "D", "E"]).optional(),
+    resolucao: z.string(),
+    anoReferencia: z.string(),
+  })
+  .transform((question) => ({
+    tema: question.tema ?? question.titulo ?? "Física do ENEM",
+    enunciado: question.enunciado,
+    alternativas: question.alternativas,
+    correta: question.correta ?? question.alternativaCorreta ?? "A",
+    resolucao: question.resolucao,
+    anoReferencia: question.anoReferencia,
+  }));
+
 export type Question = z.infer<typeof QuestionSchema>;
 
 const Input = z.object({
   topic: z.enum(TOPICS),
 });
+
+function parseQuestionFromText(text: string | undefined): Question | null {
+  if (!text) return null;
+
+  const trimmed = text.trim();
+  const jsonText = trimmed.match(/```(?:json)?\s*([\s\S]*?)\s*```/)?.[1] ?? trimmed;
+
+  try {
+    const parsed = JSON.parse(jsonText);
+    const firstQuestion = Array.isArray(parsed) ? parsed[0] : parsed;
+    return QuestionSchema.parse(RawQuestionSchema.parse(firstQuestion));
+  } catch (parseError) {
+    console.error("Falha ao normalizar questão gerada:", parseError);
+    return null;
+  }
+}
 
 export const generateQuestion = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => Input.parse(input))
@@ -63,7 +105,9 @@ Regras obrigatórias:
 
     const prompt = `${topicInstruction}
 
-Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").`;
+Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").
+
+Responda como um único objeto JSON com exatamente estes campos: tema, enunciado, alternativas, correta, resolucao, anoReferencia. O campo alternativas deve ter as chaves A, B, C, D e E. O campo correta deve ser apenas uma letra de A até E.`;
 
     try {
       const { object } = await generateObject({
@@ -71,10 +115,14 @@ Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe ta
         system,
         prompt,
         schema: QuestionSchema,
+        maxOutputTokens: 3000,
       });
       return object;
     } catch (error) {
       if (NoObjectGeneratedError.isInstance(error)) {
+        const fallbackQuestion = parseQuestionFromText(error.text);
+        if (fallbackQuestion) return fallbackQuestion;
+
         console.error("NoObjectGenerated:", error.text);
         throw new Error("Não foi possível gerar a questão. Tente novamente.");
       }
