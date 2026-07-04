@@ -255,6 +255,16 @@ function Home() {
                 />
               )}
 
+              {question.imagemUrl && (
+                <div className="mt-5 overflow-hidden rounded-lg border border-border/60 bg-white p-3">
+                  <img
+                    src={question.imagemUrl}
+                    alt={question.descricaoImagem ?? "Figura da questão"}
+                    className="mx-auto max-h-[360px] w-auto"
+                  />
+                </div>
+              )}
+
               <div className="mt-6 space-y-2">
                 {LETTERS.map((L) => {
                   const isSelected = selected === L;
