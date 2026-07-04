@@ -66,13 +66,13 @@ Regras obrigatórias:
 Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").`;
 
     try {
-      const { experimental_output } = await generateText({
-        model: gateway("google/gemini-2.5-flash"),
+      const { output } = await generateText({
+        model: gateway("google/gemini-3-flash-preview"),
         system,
         prompt,
-        experimental_output: Output.object({ schema: QuestionSchema }),
+        output: Output.object({ schema: QuestionSchema }),
       });
-      return experimental_output;
+      return output;
     } catch (error) {
       if (NoObjectGeneratedError.isInstance(error)) {
         throw new Error("Não foi possível gerar a questão. Tente novamente.");
