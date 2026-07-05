@@ -86,8 +86,8 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:site", content: "@Lovable" },
       { name: "twitter:title", content: "Física ENEM — Gerador de Questões com IA" },
       { name: "twitter:description", content: "Treine Física para o ENEM com questões inéditas geradas por IA, inspiradas em provas oficiais." },
-      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/yu4TMHh4MfN7sJ2YXp7tPjIMrey1/social-images/social-1783280141979-1000472126.webp" },
-      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/yu4TMHh4MfN7sJ2YXp7tPjIMrey1/social-images/social-1783280141979-1000472126.webp" },
+      { property: "og:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/yu4TMHh4MfN7sJ2YXp7tPjIMrey1/social-images/social-1783280319658-1000472126.webp" },
+      { name: "twitter:image", content: "https://storage.googleapis.com/gpt-engineer-file-uploads/yu4TMHh4MfN7sJ2YXp7tPjIMrey1/social-images/social-1783280319658-1000472126.webp" },
     ],
     links: [
       {
