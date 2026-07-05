@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Atom, Sparkles, Eye, RefreshCw, CheckCircle2, XCircle, Loader2, BookOpen, History, Trash2, X } from "lucide-react";
+import { Atom, Sparkles, Eye, RefreshCw, CheckCircle2, XCircle, Loader2, BookOpen, History, Trash2, X, Sun, Moon, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { generateQuestion, TOPICS, type Question, type Topic } from "@/lib/questions.functions";
+import { generateQuestion, TOPICS, SUBTOPICS, type Question, type Topic } from "@/lib/questions.functions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -26,17 +26,20 @@ type HistoryItem = {
   id: string;
   createdAt: number;
   topic: Topic;
+  subtopic?: string | null;
   question: Question;
   selected: Letter | null;
   acertou: boolean | null;
 };
 
 const HISTORY_KEY = "fisica-enem-historico-v1";
+const THEME_KEY = "fisica-enem-tema";
 const MAX_HISTORY = 50;
 
 function Home() {
   const generate = useServerFn(generateQuestion);
   const [topic, setTopic] = useState<Topic>("Aleatório");
+  const [subtopic, setSubtopic] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState<Question | null>(null);
   const [selected, setSelected] = useState<Letter | null>(null);
@@ -45,6 +48,8 @@ function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [tipsOpen, setTipsOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -57,7 +62,29 @@ function Home() {
         setStats({ acertos: a, erros: e });
       }
     } catch {}
+    try {
+      const t = (localStorage.getItem(THEME_KEY) as "dark" | "light" | null) ?? "dark";
+      setTheme(t);
+      applyTheme(t);
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    setSubtopic("");
+  }, [topic]);
+
+  function applyTheme(t: "dark" | "light") {
+    const root = document.documentElement;
+    if (t === "light") root.classList.add("light-mode");
+    else root.classList.remove("light-mode");
+  }
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch {}
+  }
 
   function persist(next: HistoryItem[]) {
     setHistory(next);
@@ -73,12 +100,13 @@ function Home() {
     setRevealed(false);
     setCurrentId(null);
     try {
-      const q = await generate({ data: { topic } });
+      const q = await generate({ data: { topic, subtopic: subtopic || undefined } });
       setQuestion(q);
       const item: HistoryItem = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
         topic,
+        subtopic: subtopic || null,
         question: q,
         selected: null,
         acertou: null,
@@ -117,6 +145,7 @@ function Home() {
   function loadFromHistory(item: HistoryItem) {
     setQuestion(item.question);
     setTopic(item.topic);
+    setSubtopic(item.subtopic ?? "");
     setSelected(item.selected);
     setRevealed(item.selected !== null);
     setCurrentId(item.id);
@@ -167,6 +196,15 @@ function Home() {
             <div className="ml-auto hidden items-center gap-4 sm:flex">
               <StatPill label="Acertos" value={stats.acertos} tone="success" />
               <StatPill label="Erros" value={stats.erros} tone="destructive" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label="Alternar tema"
+                title={theme === "dark" ? "Tema claro" : "Tema escuro"}
+              >
+                {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </Button>
             </div>
           </div>
         </div>
@@ -193,6 +231,43 @@ function Home() {
             </TabsList>
           </Tabs>
 
+          {SUBTOPICS[topic]?.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                Subtópico (opcional)
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSubtopic("")}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs transition",
+                    subtopic === ""
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/60 bg-secondary/30 text-muted-foreground hover:border-primary/50",
+                  )}
+                >
+                  Todos
+                </button>
+                {SUBTOPICS[topic].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSubtopic(s)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition",
+                      subtopic === s
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border/60 bg-secondary/30 text-muted-foreground hover:border-primary/50",
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button
               size="lg"
@@ -215,7 +290,7 @@ function Home() {
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              A IA cria uma questão inspirada em provas oficiais do ENEM, alterando contexto e valores.
+              A IA cria uma questão inspirada em provas oficiais do ENEM (2022 em diante), alterando contexto e valores.
             </p>
           </div>
         </Card>
@@ -352,6 +427,29 @@ function Home() {
         </footer>
       </main>
       </div>
+
+      {/* Floating theme toggle (visible mobile) */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label="Alternar tema claro/escuro"
+        className="fixed bottom-4 right-4 z-30 grid size-11 place-items-center rounded-full border border-border/60 bg-card/90 text-foreground shadow-lg backdrop-blur transition hover:bg-card sm:hidden"
+      >
+        {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
+      </button>
+
+      {/* Formulário / dicas */}
+      <button
+        type="button"
+        onClick={() => setTipsOpen(true)}
+        className="fixed bottom-4 right-20 z-30 flex items-center gap-2 rounded-full border border-border/60 bg-card/90 px-4 py-2 text-xs font-medium text-foreground shadow-lg backdrop-blur transition hover:bg-card sm:bottom-6 sm:right-6"
+        aria-label="Abrir dicas e fórmulas"
+      >
+        <Lightbulb className="size-4 text-primary" />
+        <span className="hidden sm:inline">Fórmulas & Dicas</span>
+      </button>
+
+      <TipsDialog open={tipsOpen} onClose={() => setTipsOpen(false)} />
     </div>
   );
 }
@@ -499,5 +597,125 @@ function SkeletonQuestion() {
         ))}
       </div>
     </Card>
+  );
+}
+
+const FORMULAS: { area: string; itens: { nome: string; formula: string }[] }[] = [
+  {
+    area: "Mecânica",
+    itens: [
+      { nome: "MU", formula: "S = S₀ + v·t" },
+      { nome: "MUV", formula: "v = v₀ + a·t   |   S = S₀ + v₀·t + a·t²/2" },
+      { nome: "Torricelli", formula: "v² = v₀² + 2·a·ΔS" },
+      { nome: "2ª Lei de Newton", formula: "F = m·a" },
+      { nome: "Energia cinética", formula: "Ec = m·v²/2" },
+      { nome: "Energia potencial", formula: "Ep = m·g·h" },
+      { nome: "Trabalho", formula: "τ = F·d·cosθ" },
+      { nome: "Impulso / Q. movimento", formula: "I = F·Δt = Δ(m·v)" },
+    ],
+  },
+  {
+    area: "Termologia",
+    itens: [
+      { nome: "Escalas", formula: "(TC)/5 = (TF−32)/9 = (TK−273)/5" },
+      { nome: "Calor sensível", formula: "Q = m·c·ΔT" },
+      { nome: "Calor latente", formula: "Q = m·L" },
+      { nome: "Gases ideais", formula: "P·V = n·R·T" },
+      { nome: "1ª Lei da Termodinâmica", formula: "ΔU = Q − τ" },
+    ],
+  },
+  {
+    area: "Ondulatória & Óptica",
+    itens: [
+      { nome: "Velocidade da onda", formula: "v = λ·f" },
+      { nome: "Equação de Gauss (lentes)", formula: "1/f = 1/p + 1/p'" },
+      { nome: "Aumento", formula: "A = −p'/p = i/o" },
+      { nome: "Snell-Descartes", formula: "n₁·senθ₁ = n₂·senθ₂" },
+    ],
+  },
+  {
+    area: "Eletricidade & Magnetismo",
+    itens: [
+      { nome: "Lei de Coulomb", formula: "F = k·|q₁·q₂|/d²" },
+      { nome: "1ª Lei de Ohm", formula: "U = R·i" },
+      { nome: "Potência elétrica", formula: "P = U·i = R·i² = U²/R" },
+      { nome: "Consumo (kWh)", formula: "E = P·Δt" },
+      { nome: "Força magnética", formula: "F = |q|·v·B·senθ" },
+    ],
+  },
+  {
+    area: "Física Moderna",
+    itens: [
+      { nome: "Energia do fóton", formula: "E = h·f" },
+      { nome: "Efeito fotoelétrico", formula: "Ec = h·f − W" },
+      { nome: "Equivalência massa-energia", formula: "E = m·c²" },
+    ],
+  },
+];
+
+const DICAS = [
+  "Leia primeiro a pergunta (última linha) para focar apenas no que precisa do enunciado.",
+  "Converta todas as unidades para o SI antes de calcular (m, kg, s, N, J, W).",
+  "Sublinhe dados numéricos e o que se pede — evita erro de interpretação.",
+  "Em gráficos, sempre observe eixos, escala e unidades antes de calcular áreas ou inclinações.",
+  "Elimine alternativas absurdas por ordem de grandeza antes de fazer contas detalhadas.",
+  "Gerencie o tempo: ~3 min por questão. Se travar, marque e volte depois.",
+];
+
+function TipsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border/60 bg-card p-5 shadow-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <Lightbulb className="size-5 text-primary" />
+          <h3 className="text-lg font-bold">Fórmulas & Dicas do ENEM</h3>
+          <Button variant="ghost" size="icon" className="ml-auto" onClick={onClose} aria-label="Fechar">
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          {FORMULAS.map((bloco) => (
+            <div key={bloco.area}>
+              <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">
+                {bloco.area}
+              </h4>
+              <ul className="space-y-1.5">
+                {bloco.itens.map((it) => (
+                  <li
+                    key={it.nome}
+                    className="flex flex-col gap-0.5 rounded-md border border-border/50 bg-secondary/30 p-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <span className="text-xs font-medium text-muted-foreground">{it.nome}</span>
+                    <span className="font-mono text-sm text-foreground">{it.formula}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          <div>
+            <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent">
+              Dicas de prova
+            </h4>
+            <ul className="space-y-1.5 text-sm text-foreground/90">
+              {DICAS.map((d) => (
+                <li key={d} className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>{d}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
   );
 }
