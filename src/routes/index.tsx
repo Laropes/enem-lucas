@@ -599,3 +599,123 @@ function SkeletonQuestion() {
     </Card>
   );
 }
+
+const FORMULAS: { area: string; itens: { nome: string; formula: string }[] }[] = [
+  {
+    area: "Mecânica",
+    itens: [
+      { nome: "MU", formula: "S = S₀ + v·t" },
+      { nome: "MUV", formula: "v = v₀ + a·t   |   S = S₀ + v₀·t + a·t²/2" },
+      { nome: "Torricelli", formula: "v² = v₀² + 2·a·ΔS" },
+      { nome: "2ª Lei de Newton", formula: "F = m·a" },
+      { nome: "Energia cinética", formula: "Ec = m·v²/2" },
+      { nome: "Energia potencial", formula: "Ep = m·g·h" },
+      { nome: "Trabalho", formula: "τ = F·d·cosθ" },
+      { nome: "Impulso / Q. movimento", formula: "I = F·Δt = Δ(m·v)" },
+    ],
+  },
+  {
+    area: "Termologia",
+    itens: [
+      { nome: "Escalas", formula: "(TC)/5 = (TF−32)/9 = (TK−273)/5" },
+      { nome: "Calor sensível", formula: "Q = m·c·ΔT" },
+      { nome: "Calor latente", formula: "Q = m·L" },
+      { nome: "Gases ideais", formula: "P·V = n·R·T" },
+      { nome: "1ª Lei da Termodinâmica", formula: "ΔU = Q − τ" },
+    ],
+  },
+  {
+    area: "Ondulatória & Óptica",
+    itens: [
+      { nome: "Velocidade da onda", formula: "v = λ·f" },
+      { nome: "Equação de Gauss (lentes)", formula: "1/f = 1/p + 1/p'" },
+      { nome: "Aumento", formula: "A = −p'/p = i/o" },
+      { nome: "Snell-Descartes", formula: "n₁·senθ₁ = n₂·senθ₂" },
+    ],
+  },
+  {
+    area: "Eletricidade & Magnetismo",
+    itens: [
+      { nome: "Lei de Coulomb", formula: "F = k·|q₁·q₂|/d²" },
+      { nome: "1ª Lei de Ohm", formula: "U = R·i" },
+      { nome: "Potência elétrica", formula: "P = U·i = R·i² = U²/R" },
+      { nome: "Consumo (kWh)", formula: "E = P·Δt" },
+      { nome: "Força magnética", formula: "F = |q|·v·B·senθ" },
+    ],
+  },
+  {
+    area: "Física Moderna",
+    itens: [
+      { nome: "Energia do fóton", formula: "E = h·f" },
+      { nome: "Efeito fotoelétrico", formula: "Ec = h·f − W" },
+      { nome: "Equivalência massa-energia", formula: "E = m·c²" },
+    ],
+  },
+];
+
+const DICAS = [
+  "Leia primeiro a pergunta (última linha) para focar apenas no que precisa do enunciado.",
+  "Converta todas as unidades para o SI antes de calcular (m, kg, s, N, J, W).",
+  "Sublinhe dados numéricos e o que se pede — evita erro de interpretação.",
+  "Em gráficos, sempre observe eixos, escala e unidades antes de calcular áreas ou inclinações.",
+  "Elimine alternativas absurdas por ordem de grandeza antes de fazer contas detalhadas.",
+  "Gerencie o tempo: ~3 min por questão. Se travar, marque e volte depois.",
+];
+
+function TipsDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-background/70 p-0 backdrop-blur-sm sm:items-center sm:p-4"
+      onClick={onClose}
+    >
+      <div
+        className="max-h-[85vh] w-full max-w-2xl overflow-y-auto rounded-t-2xl border border-border/60 bg-card p-5 shadow-2xl sm:rounded-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center gap-2">
+          <Lightbulb className="size-5 text-primary" />
+          <h3 className="text-lg font-bold">Fórmulas & Dicas do ENEM</h3>
+          <Button variant="ghost" size="icon" className="ml-auto" onClick={onClose} aria-label="Fechar">
+            <X className="size-4" />
+          </Button>
+        </div>
+
+        <div className="space-y-4">
+          {FORMULAS.map((bloco) => (
+            <div key={bloco.area}>
+              <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-primary">
+                {bloco.area}
+              </h4>
+              <ul className="space-y-1.5">
+                {bloco.itens.map((it) => (
+                  <li
+                    key={it.nome}
+                    className="flex flex-col gap-0.5 rounded-md border border-border/50 bg-secondary/30 p-2 sm:flex-row sm:items-center sm:justify-between"
+                  >
+                    <span className="text-xs font-medium text-muted-foreground">{it.nome}</span>
+                    <span className="font-mono text-sm text-foreground">{it.formula}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          ))}
+
+          <div>
+            <h4 className="mb-2 text-sm font-semibold uppercase tracking-wider text-accent">
+              Dicas de prova
+            </h4>
+            <ul className="space-y-1.5 text-sm text-foreground/90">
+              {DICAS.map((d) => (
+                <li key={d} className="flex gap-2">
+                  <span className="text-primary">•</span>
+                  <span>{d}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
