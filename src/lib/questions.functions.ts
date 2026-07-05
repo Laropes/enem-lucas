@@ -16,6 +16,62 @@ export const TOPICS = [
 
 export type Topic = (typeof TOPICS)[number];
 
+export const SUBTOPICS: Record<Topic, string[]> = {
+  "Aleatório": [],
+  "Mecânica": [
+    "Cinemática (MU e MUV)",
+    "Lançamentos e queda livre",
+    "Leis de Newton",
+    "Trabalho e Energia",
+    "Impulso e Quantidade de Movimento",
+    "Estática e Equilíbrio",
+    "Hidrostática",
+    "Gravitação",
+  ],
+  "Termologia": [
+    "Temperatura e Escalas",
+    "Dilatação Térmica",
+    "Calorimetria",
+    "Mudanças de Estado",
+    "Transmissão de Calor",
+    "Gases Ideais",
+    "Termodinâmica",
+  ],
+  "Óptica": [
+    "Reflexão e Espelhos",
+    "Refração e Lentes",
+    "Instrumentos Ópticos",
+    "Óptica da Visão",
+  ],
+  "Ondulatória": [
+    "Ondas Mecânicas",
+    "Som e Acústica",
+    "Efeito Doppler",
+    "Interferência e Difração",
+  ],
+  "Eletricidade": [
+    "Carga e Lei de Coulomb",
+    "Campo e Potencial Elétrico",
+    "Corrente e Resistores",
+    "Circuitos e Leis de Kirchhoff",
+    "Potência e Consumo",
+    "Capacitores",
+  ],
+  "Magnetismo": [
+    "Campo Magnético",
+    "Força Magnética",
+    "Indução Eletromagnética",
+    "Transformadores",
+  ],
+  "Física Moderna": [
+    "Efeito Fotoelétrico",
+    "Dualidade Onda-Partícula",
+    "Modelos Atômicos",
+    "Radioatividade",
+    "Relatividade",
+  ],
+};
+
 const QuestionSchema = z.object({
   tema: z.string(),
   enunciado: z.string(),
@@ -68,6 +124,7 @@ export type Question = z.infer<typeof QuestionSchema>;
 
 const Input = z.object({
   topic: z.enum(TOPICS),
+  subtopic: z.string().optional(),
 });
 
 function parseQuestionFromText(text: string | undefined): Question | null {
@@ -97,7 +154,9 @@ export const generateQuestion = createServerFn({ method: "POST" })
     const topicInstruction =
       data.topic === "Aleatório"
         ? "Escolha um tema qualquer de Física do ENEM (Mecânica, Termologia, Óptica, Ondulatória, Eletricidade, Magnetismo ou Física Moderna)."
-        : `O tema deve ser obrigatoriamente ${data.topic}.`;
+        : `O tema deve ser obrigatoriamente ${data.topic}${
+            data.subtopic ? `, com foco específico no subtópico: ${data.subtopic}.` : "."
+          }`;
 
     const system = `Você é um professor de Física especialista no ENEM (Exame Nacional do Ensino Médio brasileiro). Sua tarefa é criar uma questão de Física NO ESTILO DO ENEM, baseada em uma questão OFICIAL já aplicada em edições anteriores do ENEM, mas alterando os valores numéricos, o contexto/situação e os nomes, mantendo o mesmo conceito físico e nível de dificuldade.
 
@@ -108,11 +167,12 @@ Regras obrigatórias:
 - A resolução deve explicar passo a passo o raciocínio físico e os cálculos, citando fórmulas usadas.
 - Escreva TUDO em português do Brasil.
 - Use notação simples (ex: m/s, m/s², N, J, W) sem LaTeX.
-- Nunca reproduza o texto original de uma questão do ENEM; adapte contexto e números.`;
+- Nunca reproduza o texto original de uma questão do ENEM; adapte contexto e números.
+- IMPORTANTE: use apenas questões do ENEM de 2022 em diante (ENEM 2022, 2023, 2024 ou 2025) como inspiração. Nunca use questões anteriores a 2022. O campo anoReferencia deve começar obrigatoriamente com "Inspirada em ENEM 20XX" onde XX é 22, 23, 24 ou 25.`;
 
     const prompt = `${topicInstruction}
 
-Gere UMA questão inédita inspirada em uma questão oficial do ENEM. Informe também o ano da questão oficial que inspirou (campo anoReferencia, ex: "Inspirada em ENEM 2019").
+Gere UMA questão inédita inspirada em uma questão OFICIAL do ENEM aplicada entre 2022 e 2025. Informe o ano da questão oficial que inspirou no campo anoReferencia (ex: "Inspirada em ENEM 2023"). Não use questões anteriores a 2022.
 
 Sempre que o problema envolver diagramas (circuitos, forças, planos inclinados, lentes, ondas, gráficos etc.), inclua o campo opcional "descricaoImagem" com uma descrição VISUAL DETALHADA em português da figura que deve acompanhar a questão. Descreva de forma clara e específica todos os elementos, rótulos, vetores, ângulos e valores relevantes (ex: "Diagrama esquemático de um plano inclinado de 30° com um bloco de massa m sobre a superfície, seta indicando o vetor peso vertical para baixo e vetor normal perpendicular ao plano, rótulos 'm', 'θ=30°', 'N', 'P'."). Não inclua o campo imagemSvg. Se a questão não precisar de figura, OMITA descricaoImagem.
 
