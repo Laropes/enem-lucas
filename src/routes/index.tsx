@@ -1,11 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, useEffect } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { Atom, Sparkles, Eye, RefreshCw, CheckCircle2, XCircle, Loader2, BookOpen, History, Trash2, X } from "lucide-react";
+import { Atom, Sparkles, Eye, RefreshCw, CheckCircle2, XCircle, Loader2, BookOpen, History, Trash2, X, Sun, Moon, Lightbulb } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { generateQuestion, TOPICS, type Question, type Topic } from "@/lib/questions.functions";
+import { generateQuestion, TOPICS, SUBTOPICS, type Question, type Topic } from "@/lib/questions.functions";
 import { cn } from "@/lib/utils";
 import { toast } from "sonner";
 
@@ -26,17 +26,20 @@ type HistoryItem = {
   id: string;
   createdAt: number;
   topic: Topic;
+  subtopic?: string | null;
   question: Question;
   selected: Letter | null;
   acertou: boolean | null;
 };
 
 const HISTORY_KEY = "fisica-enem-historico-v1";
+const THEME_KEY = "fisica-enem-tema";
 const MAX_HISTORY = 50;
 
 function Home() {
   const generate = useServerFn(generateQuestion);
   const [topic, setTopic] = useState<Topic>("Aleatório");
+  const [subtopic, setSubtopic] = useState<string>("");
   const [loading, setLoading] = useState(false);
   const [question, setQuestion] = useState<Question | null>(null);
   const [selected, setSelected] = useState<Letter | null>(null);
@@ -45,6 +48,8 @@ function Home() {
   const [history, setHistory] = useState<HistoryItem[]>([]);
   const [currentId, setCurrentId] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [theme, setTheme] = useState<"dark" | "light">("dark");
+  const [tipsOpen, setTipsOpen] = useState(false);
 
   useEffect(() => {
     try {
@@ -57,7 +62,29 @@ function Home() {
         setStats({ acertos: a, erros: e });
       }
     } catch {}
+    try {
+      const t = (localStorage.getItem(THEME_KEY) as "dark" | "light" | null) ?? "dark";
+      setTheme(t);
+      applyTheme(t);
+    } catch {}
   }, []);
+
+  useEffect(() => {
+    setSubtopic("");
+  }, [topic]);
+
+  function applyTheme(t: "dark" | "light") {
+    const root = document.documentElement;
+    if (t === "light") root.classList.add("light-mode");
+    else root.classList.remove("light-mode");
+  }
+
+  function toggleTheme() {
+    const next = theme === "dark" ? "light" : "dark";
+    setTheme(next);
+    applyTheme(next);
+    try { localStorage.setItem(THEME_KEY, next); } catch {}
+  }
 
   function persist(next: HistoryItem[]) {
     setHistory(next);
@@ -73,12 +100,13 @@ function Home() {
     setRevealed(false);
     setCurrentId(null);
     try {
-      const q = await generate({ data: { topic } });
+      const q = await generate({ data: { topic, subtopic: subtopic || undefined } });
       setQuestion(q);
       const item: HistoryItem = {
         id: crypto.randomUUID(),
         createdAt: Date.now(),
         topic,
+        subtopic: subtopic || null,
         question: q,
         selected: null,
         acertou: null,
@@ -117,6 +145,7 @@ function Home() {
   function loadFromHistory(item: HistoryItem) {
     setQuestion(item.question);
     setTopic(item.topic);
+    setSubtopic(item.subtopic ?? "");
     setSelected(item.selected);
     setRevealed(item.selected !== null);
     setCurrentId(item.id);
@@ -167,6 +196,15 @@ function Home() {
             <div className="ml-auto hidden items-center gap-4 sm:flex">
               <StatPill label="Acertos" value={stats.acertos} tone="success" />
               <StatPill label="Erros" value={stats.erros} tone="destructive" />
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={toggleTheme}
+                aria-label="Alternar tema"
+                title={theme === "dark" ? "Tema claro" : "Tema escuro"}
+              >
+                {theme === "dark" ? <Sun className="size-4" /> : <Moon className="size-4" />}
+              </Button>
             </div>
           </div>
         </div>
@@ -193,6 +231,43 @@ function Home() {
             </TabsList>
           </Tabs>
 
+          {SUBTOPICS[topic]?.length > 0 && (
+            <div className="mt-3">
+              <div className="mb-2 text-xs font-medium text-muted-foreground">
+                Subtópico (opcional)
+              </div>
+              <div className="flex flex-wrap gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => setSubtopic("")}
+                  className={cn(
+                    "rounded-full border px-3 py-1 text-xs transition",
+                    subtopic === ""
+                      ? "border-primary bg-primary/15 text-primary"
+                      : "border-border/60 bg-secondary/30 text-muted-foreground hover:border-primary/50",
+                  )}
+                >
+                  Todos
+                </button>
+                {SUBTOPICS[topic].map((s) => (
+                  <button
+                    key={s}
+                    type="button"
+                    onClick={() => setSubtopic(s)}
+                    className={cn(
+                      "rounded-full border px-3 py-1 text-xs transition",
+                      subtopic === s
+                        ? "border-primary bg-primary/15 text-primary"
+                        : "border-border/60 bg-secondary/30 text-muted-foreground hover:border-primary/50",
+                    )}
+                  >
+                    {s}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button
               size="lg"
@@ -215,7 +290,7 @@ function Home() {
               )}
             </Button>
             <p className="text-xs text-muted-foreground">
-              A IA cria uma questão inspirada em provas oficiais do ENEM, alterando contexto e valores.
+              A IA cria uma questão inspirada em provas oficiais do ENEM (2022 em diante), alterando contexto e valores.
             </p>
           </div>
         </Card>
@@ -352,6 +427,29 @@ function Home() {
         </footer>
       </main>
       </div>
+
+      {/* Floating theme toggle (visible mobile) */}
+      <button
+        type="button"
+        onClick={toggleTheme}
+        aria-label="Alternar tema claro/escuro"
+        className="fixed bottom-4 right-4 z-30 grid size-11 place-items-center rounded-full border border-border/60 bg-card/90 text-foreground shadow-lg backdrop-blur transition hover:bg-card sm:hidden"
+      >
+        {theme === "dark" ? <Sun className="size-5" /> : <Moon className="size-5" />}
+      </button>
+
+      {/* Formulário / dicas */}
+      <button
+        type="button"
+        onClick={() => setTipsOpen(true)}
+        className="fixed bottom-4 right-20 z-30 flex items-center gap-2 rounded-full border border-border/60 bg-card/90 px-4 py-2 text-xs font-medium text-foreground shadow-lg backdrop-blur transition hover:bg-card sm:bottom-6 sm:right-6"
+        aria-label="Abrir dicas e fórmulas"
+      >
+        <Lightbulb className="size-4 text-primary" />
+        <span className="hidden sm:inline">Fórmulas & Dicas</span>
+      </button>
+
+      <TipsDialog open={tipsOpen} onClose={() => setTipsOpen(false)} />
     </div>
   );
 }
